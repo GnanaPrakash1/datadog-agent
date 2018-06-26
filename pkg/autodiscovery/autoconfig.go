@@ -415,22 +415,6 @@ func (ac *AutoConfig) pollConfigs() {
 				return
 			case <-ac.health.C:
 			case <-ac.configsPollTicker.C:
-				// check if services tags are up to date
-				for _, service := range ac.configResolver.services {
-					previousHash := ac.store.getTagsHashForService(service.GetID())
-					// TODO: harmonize service & entities ID
-					entityName := string(service.GetID())
-					if !strings.Contains(entityName, "://") {
-						entityName = docker.ContainerIDToEntityName(entityName)
-					}
-					currentHash := tagger.GetEntityHash(entityName)
-					if currentHash != previousHash {
-						log.Debugf("Tags changed for service %s, rescheduling associated checks", string(service.GetID()))
-						ac.configResolver.processDelService(service)
-						ac.configResolver.processNewService(service)
-						ac.store.setTagsHashForService(service.GetID(), currentHash)
-					}
-				}
 				// invoke Collect on the known providers
 				for _, pd := range ac.providers {
 					// skip providers that don't want to be polled
@@ -459,6 +443,22 @@ func (ac *AutoConfig) pollConfigs() {
 						resolvedConfigs := ac.resolve(config)
 						checks := ac.getChecksFromConfigs(resolvedConfigs, true)
 						ac.schedule(checks)
+					}
+				}
+				// check if services tags are up to date
+				for _, service := range ac.configResolver.services {
+					previousHash := ac.store.getTagsHashForService(service.GetID())
+					// TODO: harmonize service & entities ID
+					entityName := string(service.GetID())
+					if !strings.Contains(entityName, "://") {
+						entityName = docker.ContainerIDToEntityName(entityName)
+					}
+					currentHash := tagger.GetEntityHash(entityName)
+					if len(previousHash) > 0 && currentHash != previousHash {
+						log.Debugf("Tags changed for service %s, rescheduling associated checks", string(service.GetID()))
+						ac.configResolver.processDelService(service)
+						ac.configResolver.processNewService(service)
+						ac.store.setTagsHashForService(service.GetID(), currentHash)
 					}
 				}
 			}

@@ -110,6 +110,7 @@ func (cr *ConfigResolver) Stop() {
 // resolver at this moment.
 func (cr *ConfigResolver) ResolveTemplate(tpl integration.Config) []integration.Config {
 	// use a map to dedupe configurations
+	// FIXME: the config digest as the key is currently not reliable
 	resolvedSet := map[string]integration.Config{}
 
 	// go through the AD identifiers provided by the template
@@ -243,6 +244,10 @@ func (cr *ConfigResolver) processNewService(svc listeners.Service) {
 
 // processDelService takes a service, stops its associated checks, and updates the cache
 func (cr *ConfigResolver) processDelService(svc listeners.Service) {
+	cr.m.Lock()
+	defer cr.m.Unlock()
+
+	delete(cr.services, svc.GetID())
 	configs := cr.ac.store.getConfigsForService(svc.GetID())
 	cr.ac.store.removeConfigsForService(svc.GetID())
 	cr.ac.processRemovedConfigs(configs)
